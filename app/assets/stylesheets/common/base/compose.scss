@@ -362,6 +362,10 @@
   #file-uploading {
     color: var(--primary-high);
   }
+
+  #file-uploader {
+    display: none;
+  }
 }
 
 .autocomplete {
@@ -480,11 +484,6 @@ div.ac-wrap {
       width: 100%;
     }
   }
-}
-
-.save-animation {
-  -webkit-animation: transformer 5s forwards;
-  animation: transformer 5s forwards;
 }
 
 @-webkit-keyframes transformer {

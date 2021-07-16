@@ -494,6 +494,47 @@ describe PostCreator do
               expect(@post.topic.tags.map(&:name)).to eq([existing_tag1.name])
             end
           end
+
+          context "automatically tags first posts" do
+            before do
+              SiteSetting.min_trust_to_create_tag = 0
+              SiteSetting.min_trust_level_to_tag_topics = 0
+            end
+
+            context "without regular expressions" do
+              it "works with many tags" do
+                Fabricate(:watched_word, action: WatchedWord.actions[:tag], word: "HELLO", replacement: "greetings , hey")
+
+                @post = creator.create
+                expect(@post.topic.tags.map(&:name)).to match_array(['greetings', 'hey'])
+              end
+
+              it "works with overlapping words" do
+                Fabricate(:watched_word, action: WatchedWord.actions[:tag], word: "art", replacement: "about-art")
+                Fabricate(:watched_word, action: WatchedWord.actions[:tag], word: "artist*", replacement: "about-artists")
+
+                post = PostCreator.new(user, title: "hello world topic", raw: "this is topic abour artists", archetype_id: 1).create
+                expect(post.topic.tags.map(&:name)).to match_array(['about-artists'])
+              end
+
+              it "does not treat as regular expressions" do
+                Fabricate(:watched_word, action: WatchedWord.actions[:tag], word: "he(llo|y)", replacement: "greetings , hey")
+
+                @post = creator_with_tags.create
+                expect(@post.topic.tags.map(&:name)).to match_array(tag_names)
+              end
+            end
+
+            context "with regular expressions" do
+              it "works" do
+                SiteSetting.watched_words_regular_expressions = true
+                Fabricate(:watched_word, action: WatchedWord.actions[:tag], word: "he(llo|y)", replacement: "greetings , hey")
+
+                @post = creator_with_tags.create
+                expect(@post.topic.tags.map(&:name)).to match_array(tag_names + ['greetings', 'hey'])
+              end
+            end
+          end
         end
       end
     end
@@ -641,7 +682,7 @@ describe PostCreator do
         SiteSetting.unique_posts_mins = 10
       end
 
-      it "fails for dupe post accross topic" do
+      it "fails for dupe post across topic" do
         first = create_post(raw: "this is a test #{SecureRandom.hex}")
         second = create_post(raw: "this is a test #{SecureRandom.hex}")
 
@@ -1200,7 +1241,7 @@ describe PostCreator do
       DiscourseEvent.off(:topic_created, &@increase_topics)
     end
 
-    it "fires boths event when creating a topic" do
+    it "fires both event when creating a topic" do
       pc = PostCreator.new(user, raw: 'this is the new content for my topic', title: 'this is my new topic title')
       _post = pc.create
       expect(@posts_created).to eq(1)

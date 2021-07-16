@@ -129,7 +129,7 @@ class Toolbar {
     this.addButton({
       id: "code",
       group: "insertions",
-      shortcut: "Shift+C",
+      shortcut: "E",
       preventFocus: true,
       trimLeading: true,
       action: (...args) => this.context.send("formatCode", args),
@@ -422,6 +422,9 @@ export default Component.extend({
         );
 
         loadScript("/javascripts/diffhtml.min.js").then(() => {
+          // changing the contents of the preview element between two uses of
+          // diff.innerHTML did not apply the diff correctly
+          window.diff.release(this.element.querySelector(".d-editor-preview"));
           window.diff.innerHTML(
             this.element.querySelector(".d-editor-preview"),
             cookedElement.innerHTML,
@@ -435,7 +438,7 @@ export default Component.extend({
       }
 
       schedule("afterRender", () => {
-        if (this._state !== "inDOM") {
+        if (this._state !== "inDOM" || !this.element) {
           return;
         }
         const $preview = $(this.element.querySelector(".d-editor-preview"));
@@ -650,6 +653,10 @@ export default Component.extend({
 
   _selectText(from, length, opts = { scroll: true }) {
     next(() => {
+      if (!this.element) {
+        return;
+      }
+
       const textarea = this.element.querySelector("textarea.d-editor-input");
       const $textarea = $(textarea);
       textarea.selectionStart = from;

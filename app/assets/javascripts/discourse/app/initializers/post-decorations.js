@@ -1,11 +1,10 @@
+import { later } from "@ember/runloop";
+import I18n from "I18n";
 import highlightSyntax from "discourse/lib/highlight-syntax";
 import lightbox from "discourse/lib/lightbox";
 import { iconHTML } from "discourse-common/lib/icon-library";
 import { setTextDirections } from "discourse/lib/text-direction";
-import {
-  nativeLazyLoading,
-  setupLazyLoading,
-} from "discourse/lib/lazy-load-images";
+import { nativeLazyLoading } from "discourse/lib/lazy-load-images";
 import { withPluginApi } from "discourse/lib/plugin-api";
 
 export default {
@@ -36,11 +35,7 @@ export default {
         });
       }
 
-      if (siteSettings.disable_image_size_calculations) {
-        nativeLazyLoading(api);
-      } else {
-        setupLazyLoading(api);
-      }
+      nativeLazyLoading(api);
 
       api.decorateCooked(
         ($elem) => {
@@ -86,6 +81,7 @@ export default {
 
       const oneboxTypes = {
         amazon: "discourse-amazon",
+        githubactions: "fab-github",
         githubblob: "fab-github",
         githubcommit: "fab-github",
         githubpullrequest: "fab-github",
@@ -109,6 +105,31 @@ export default {
           });
         },
         { id: "onebox-source-icons" }
+      );
+
+      api.decorateCookedElement(
+        (element) => {
+          element
+            .querySelectorAll(".video-container")
+            .forEach((videoContainer) => {
+              const video = videoContainer.getElementsByTagName("video")[0];
+              video.addEventListener("loadeddata", () => {
+                later(() => {
+                  if (video.videoWidth === 0 || video.videoHeight === 0) {
+                    const notice = document.createElement("div");
+                    notice.className = "notice";
+                    notice.innerHTML =
+                      iconHTML("exclamation-triangle") +
+                      " " +
+                      I18n.t("cannot_render_video");
+
+                    videoContainer.appendChild(notice);
+                  }
+                }, 500);
+              });
+            });
+        },
+        { id: "discourse-video-codecs" }
       );
     });
   },

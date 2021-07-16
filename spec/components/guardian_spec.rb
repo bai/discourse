@@ -506,11 +506,6 @@ describe Guardian do
       expect(Guardian.new(moderator).can_invite_to_forum?).to be_truthy
     end
 
-    it 'returns false when the site requires approving users and is regular' do
-      SiteSetting.expects(:must_approve_users?).returns(true)
-      expect(Guardian.new(user).can_invite_to_forum?).to be_falsey
-    end
-
     context 'with groups' do
       let(:groups) { [group, another_group] }
 
@@ -577,6 +572,12 @@ describe Guardian do
       it 'returns true for normal user when inviting to topic and PM disabled' do
         SiteSetting.enable_personal_messages = false
         expect(Guardian.new(trust_level_2).can_invite_to?(topic)).to be_truthy
+      end
+
+      it 'fails for normal users if must_approve_users' do
+        SiteSetting.must_approve_users = true
+        expect(Guardian.new(user).can_invite_to?(topic)).to be_falsey
+        expect(Guardian.new(admin).can_invite_to?(topic)).to be_truthy
       end
 
       describe 'for a private category for automatic and non-automatic group' do
@@ -658,7 +659,7 @@ describe Guardian do
         end
       end
 
-      context "when PM has receached the maximum number of recipients" do
+      context "when PM has reached the maximum number of recipients" do
         before do
           SiteSetting.max_allowed_message_recipients = 2
         end
@@ -700,7 +701,7 @@ describe Guardian do
       expect(Guardian.new(admin).can_invite_via_email?(topic)).to be_falsey
     end
 
-    it 'returns correct valuse when user approval is required' do
+    it 'returns correct values when user approval is required' do
       SiteSetting.must_approve_users = true
 
       expect(Guardian.new(trust_level_2).can_invite_via_email?(topic)).to be_falsey
@@ -899,6 +900,17 @@ describe Guardian do
 
         post.topic.category.update!(reviewable_by_group_id: group.id, topic_id: post.topic.id)
         expect(Guardian.new(user_gm).can_see?(post)).to be_truthy
+      end
+
+      it 'TL4 users can see their deleted posts' do
+        user = Fabricate(:user, trust_level: 4)
+        user2 = Fabricate(:user, trust_level: 4)
+        post = Fabricate(:post, user: user, topic: Fabricate(:post).topic)
+
+        expect(Guardian.new(user).can_see?(post)).to eq(true)
+        PostDestroyer.new(user, post).destroy
+        expect(Guardian.new(user).can_see?(post)).to eq(true)
+        expect(Guardian.new(user2).can_see?(post)).to eq(false)
       end
 
       it 'respects whispers' do
@@ -2127,6 +2139,12 @@ describe Guardian do
 
       it 'returns true when trying to delete your own post' do
         expect(Guardian.new(user).can_delete?(post)).to be_truthy
+
+        expect(Guardian.new(trust_level_0).can_delete?(post)).to be_falsey
+        expect(Guardian.new(trust_level_1).can_delete?(post)).to be_falsey
+        expect(Guardian.new(trust_level_2).can_delete?(post)).to be_falsey
+        expect(Guardian.new(trust_level_3).can_delete?(post)).to be_falsey
+        expect(Guardian.new(trust_level_4).can_delete?(post)).to be_falsey
       end
 
       it 'returns false when self deletions are disabled' do
@@ -2150,6 +2168,16 @@ describe Guardian do
 
       it 'returns true when an admin' do
         expect(Guardian.new(admin).can_delete?(post)).to be_truthy
+      end
+
+      it "returns true for category moderators" do
+        SiteSetting.enable_category_group_moderation = true
+        group = Fabricate(:group)
+        GroupUser.create(group: group, user: user)
+        category = Fabricate(:category, reviewable_by_group_id: group.id)
+        post.topic.update!(category: category)
+
+        expect(Guardian.new(user).can_delete?(post)).to eq(true)
       end
 
       it 'returns false when post is first in a static doc topic' do
@@ -3827,6 +3855,36 @@ describe Guardian do
           expect(Guardian.new.can_publish_page?(topic)).to eq(false)
           expect(Guardian.new(admin).can_publish_page?(topic)).to eq(false)
         end
+      end
+    end
+  end
+
+  describe "can_see_site_contact_details" do
+    context "login_required is enabled" do
+      before do
+        SiteSetting.login_required = true
+      end
+
+      it "is false for anonymous users" do
+        expect(Guardian.new.can_see_site_contact_details?).to eq(false)
+      end
+
+      it "is true for regular users" do
+        expect(Guardian.new(user).can_see_site_contact_details?).to eq(true)
+      end
+    end
+
+    context "login_required is disabled" do
+      before do
+        SiteSetting.login_required = false
+      end
+
+      it "is true for anonymous users" do
+        expect(Guardian.new.can_see_site_contact_details?).to eq(true)
+      end
+
+      it "is true for regular users" do
+        expect(Guardian.new(user).can_see_site_contact_details?).to eq(true)
       end
     end
   end

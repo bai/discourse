@@ -5,11 +5,11 @@ require 'rails_helper'
 describe SiteSettingExtension do
 
   # We disable message bus here to avoid a large amount
-  # of uneeded messaging, tests are careful to call refresh
+  # of unneeded messaging, tests are careful to call refresh
   # when they need to.
   #
   # DistributedCache used by locale handler can under certain
-  # cases take a tiny bit to stabalize.
+  # cases take a tiny bit to stabilize.
   #
   # TODO: refactor SiteSettingExtension not to rely on statics in
   # DefaultsProvider
@@ -159,17 +159,6 @@ describe SiteSettingExtension do
       expect(settings.client_settings_json).to eq(
         %Q|{"default_locale":"#{SiteSetting.default_locale}","upload_type":"a_new_url","string_type":"changed"}|
       )
-    end
-  end
-
-  describe "multisite" do
-    it "has no db cross talk", type: :multisite do
-      settings.setting(:hello, 1)
-      settings.hello = 100
-
-      test_multisite_connection("second") do
-        expect(settings.hello).to eq(1)
-      end
     end
   end
 

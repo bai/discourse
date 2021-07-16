@@ -189,8 +189,8 @@ Discourse::Application.routes.draw do
       get "/logs" => "staff_action_logs#index"
 
       # alias
-      get '/logs/watched_words', to: redirect(relative_url_root + 'admin/customize/watched_words'), constraints: AdminConstraint.new
-      get '/logs/watched_words/*path', to: redirect(relative_url_root + 'admin/customize/watched_words/%{path}'), constraints: AdminConstraint.new
+      get '/logs/watched_words', to: redirect(relative_url_root + 'admin/customize/watched_words')
+      get '/logs/watched_words/*path', to: redirect(relative_url_root + 'admin/customize/watched_words/%{path}')
 
       get "customize" => "color_schemes#index", constraints: AdminConstraint.new
       get "customize/themes" => "themes#index", constraints: AdminConstraint.new
@@ -239,7 +239,13 @@ Discourse::Application.routes.draw do
 
         resource :email_style, only: [:show, :update]
         get 'email_style/:field' => 'email_styles#show', constraints: { field: /html|css/ }
+      end
 
+      resources :embeddable_hosts, constraints: AdminConstraint.new
+      resources :color_schemes, constraints: AdminConstraint.new
+      resources :permalinks, constraints: AdminConstraint.new
+
+      scope "/customize" do
         resources :watched_words, only: [:index, :create, :update, :destroy] do
           collection do
             get "action/:id" => "watched_words#index"
@@ -249,11 +255,6 @@ Discourse::Application.routes.draw do
         end
         post "watched_words/upload" => "watched_words#upload"
       end
-
-      resources :embeddable_hosts, constraints: AdminConstraint.new
-      resources :color_schemes, constraints: AdminConstraint.new
-
-      resources :permalinks, constraints: AdminConstraint.new
 
       get "version_check" => "versions#show"
 
@@ -386,6 +387,9 @@ Discourse::Application.routes.draw do
     get ".well-known/change-password", to: redirect(relative_url_root + 'my/preferences/account', status: 302)
 
     get "user-cards" => "users#cards", format: :json
+    get "directory-columns" => "directory_columns#index", format: :json
+    get "edit-directory-columns" => "edit_directory_columns#index", format: :json
+    put "edit-directory-columns" => "edit_directory_columns#update", format: :json
 
     %w{users u}.each_with_index do |root_path, index|
       get "#{root_path}" => "users#index", constraints: { format: 'html' }
@@ -516,7 +520,7 @@ Discourse::Application.routes.draw do
 
     get "letter_avatar_proxy/:version/letter/:letter/:color/:size.png" => "user_avatars#show_proxy_letter", constraints: { format: :png }
 
-    get "svg-sprite/:hostname/svg-:theme_ids-:version.js" => "svg_sprite#show", constraints: { hostname: /[\w\.-]+/, version: /\h{40}/, theme_ids: /([0-9]+(,[0-9]+)*)?/, format: :js }
+    get "svg-sprite/:hostname/svg-:theme_id-:version.js" => "svg_sprite#show", constraints: { hostname: /[\w\.-]+/, version: /\h{40}/, theme_id: /([0-9]+)?/, format: :js }
     get "svg-sprite/search/:keyword" => "svg_sprite#search", format: false, constraints: { keyword: /[-a-z0-9\s\%]+/ }
     get "svg-sprite/picker-search" => "svg_sprite#icon_picker_search", defaults: { format: :json }
     get "svg-sprite/:hostname/icon(/:color)/:name.svg" => "svg_sprite#svg_icon", constraints: { hostname: /[\w\.-]+/, name: /[-a-z0-9\s\%]+/, color: /(\h{3}{1,2})/, format: :svg }
@@ -527,7 +531,7 @@ Discourse::Application.routes.draw do
     get "stylesheets/:name.css" => "stylesheets#show", constraints: { name: /[-a-z0-9_]+/ }
     get "color-scheme-stylesheet/:id(/:theme_id)" => "stylesheets#color_scheme", constraints: { format: :json }
     get "theme-javascripts/:digest.js" => "theme_javascripts#show", constraints: { digest: /\h{40}/ }
-    get "theme-javascripts/tests/:theme_id.js" => "theme_javascripts#show_tests"
+    get "theme-javascripts/tests/:theme_id-:digest.js" => "theme_javascripts#show_tests"
 
     post "uploads/lookup-metadata" => "uploads#metadata"
     post "uploads" => "uploads#create"
@@ -567,6 +571,7 @@ Discourse::Application.routes.draw do
         get 'mentionable'
         get 'messageable'
         get 'logs' => 'groups#histories'
+        post 'test_email_settings'
 
         collection do
           get "check-name" => 'groups#check_name'
@@ -669,7 +674,9 @@ Discourse::Application.routes.draw do
 
     resources :badges, only: [:index]
     get "/badges/:id(/:slug)" => "badges#show", constraints: { format: /(json|html|rss)/ }
-    resources :user_badges, only: [:index, :create, :destroy]
+    resources :user_badges, only: [:index, :create, :destroy] do
+      put "toggle_favorite" => "user_badges#toggle_favorite", constraints: { format: :json }
+    end
 
     get '/c', to: redirect(relative_url_root + 'categories')
 
@@ -698,8 +705,8 @@ Discourse::Application.routes.draw do
       get "/none" => "list#category_none_latest"
 
       TopTopic.periods.each do |period|
-        get "/none/l/top/#{period}" => "list#category_none_top_#{period}", as: "category_none_top_#{period}"
-        get "/l/top/#{period}" => "list#category_top_#{period}", as: "category_top_#{period}"
+        get "/none/l/top/#{period}", to: redirect("/none/l/top?period=#{period}", status: 301)
+        get "/l/top/#{period}", to: redirect("/l/top?period=#{period}", status: 301)
       end
 
       Discourse.filters.each do |filter|
@@ -714,8 +721,9 @@ Discourse::Application.routes.draw do
     get "hashtags" => "hashtags#show"
 
     TopTopic.periods.each do |period|
-      get "top/#{period}.rss" => "list#top_#{period}_feed", format: :rss
-      get "top/#{period}" => "list#top_#{period}"
+      get "top/#{period}.rss", to: redirect("top.rss?period=#{period}", status: 301)
+      get "top/#{period}.json", to: redirect("top.json?period=#{period}", status: 301)
+      get "top/#{period}", to: redirect("top?period=#{period}", status: 301)
     end
 
     Discourse.anonymous_filters.each do |filter|
@@ -756,6 +764,7 @@ Discourse::Application.routes.draw do
       get "private-messages-archive/:username" => "list#private_messages_archive", as: "topics_private_messages_archive", defaults: { format: :json }
       get "private-messages-unread/:username" => "list#private_messages_unread", as: "topics_private_messages_unread", defaults: { format: :json }
       get "private-messages-tags/:username/:tag_id.json" => "list#private_messages_tag", as: "topics_private_messages_tag", defaults: { format: :json }
+      get "private-messages-warnings/:username" => "list#private_messages_warnings", as: "topics_private_messages_warnings", defaults: { format: :json }
       get "groups/:group_name" => "list#group_topics", as: "group_topics", group_name: RouteFormat.username
 
       scope "/private-messages-group/:username", group_name: RouteFormat.username do
@@ -807,6 +816,7 @@ Discourse::Application.routes.draw do
     post "t/:topic_id/timings" => "topics#timings", constraints: { topic_id: /\d+/ }
     post "t/:topic_id/invite" => "topics#invite", constraints: { topic_id: /\d+/ }
     post "t/:topic_id/invite-group" => "topics#invite_group", constraints: { topic_id: /\d+/ }
+    post "t/:topic_id/invite-notify" => "topics#invite_notify", constraints: { topic_id: /\d+/ }
     post "t/:topic_id/move-posts" => "topics#move_posts", constraints: { topic_id: /\d+/ }
     post "t/:topic_id/merge-topic" => "topics#merge_topic", constraints: { topic_id: /\d+/ }
     post "t/:topic_id/change-owner" => "topics#change_post_owners", constraints: { topic_id: /\d+/ }
@@ -862,7 +872,7 @@ Discourse::Application.routes.draw do
       # current site before updating to a new Service Worker.
       # Support the old Service Worker path to avoid routing error filling up the
       # logs.
-      get "/service-worker.js" => redirect(relative_url_root + service_worker_asset, status: 302), format: :js
+      get "/service-worker.js" => "static#service_worker_asset", format: :js
       get service_worker_asset => "static#service_worker_asset", format: :js
     elsif Rails.env.development?
       get "/service-worker.js" => "static#service_worker_asset", format: :js
@@ -958,6 +968,7 @@ Discourse::Application.routes.draw do
       get "/qunit" => "qunit#index"
       get "/wizard/qunit" => "wizard#qunit"
     end
+    get "/theme-qunit" => "qunit#theme"
 
     post "/push_notifications/subscribe" => "push_notification#subscribe"
     post "/push_notifications/unsubscribe" => "push_notification#unsubscribe"
@@ -968,10 +979,6 @@ Discourse::Application.routes.draw do
 
     post "/do-not-disturb" => "do_not_disturb#create"
     delete "/do-not-disturb" => "do_not_disturb#destroy"
-
-    if Rails.env.development?
-      mount DiscourseDev::Engine => "/dev/"
-    end
 
     get "*url", to: 'permalinks#show', constraints: PermalinkConstraint.new
   end

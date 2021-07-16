@@ -1,5 +1,7 @@
 import Pretender from "pretender";
 import User from "discourse/models/user";
+import getURL from "discourse-common/lib/get-url";
+import { Promise } from "rsvp";
 
 export function parsePostData(query) {
   const result = {};
@@ -39,7 +41,15 @@ const helpers = { response, success, parsePostData };
 
 export let fixturesByUrl;
 
-export default new Pretender();
+const instance = new Pretender();
+
+const oldRegister = instance.register;
+instance.register = (...args) => {
+  args[1] = getURL(args[1]);
+  return oldRegister.call(instance, ...args);
+};
+
+export default instance;
 
 export function pretenderHelpers() {
   return { parsePostData, response, success };
@@ -198,6 +208,10 @@ export function applyDefaultHandlers(pretender) {
   });
 
   pretender.get("/topics/private-messages/eviltrout.json", () => {
+    return response(fixturesByUrl["/topics/private-messages/eviltrout.json"]);
+  });
+
+  pretender.get("/topics/private-messages-warnings/eviltrout.json", () => {
     return response(fixturesByUrl["/topics/private-messages/eviltrout.json"]);
   });
 
@@ -466,10 +480,15 @@ export function applyDefaultHandlers(pretender) {
   pretender.put("/posts/:post_id/recover", success);
   pretender.get("/posts/:post_id/expand-embed", success);
 
-  pretender.put("/posts/:post_id", (request) => {
+  pretender.put("/posts/:post_id", async (request) => {
     const data = parsePostData(request.requestBody);
     if (data.post.raw === "this will 409") {
       return response(409, { errors: ["edit conflict"] });
+    } else if (data.post.raw === "will return empty json") {
+      window.resolveLastPromise();
+      return new Promise((resolve) => {
+        window.resolveLastPromise = resolve;
+      }).then(() => response(200, {}));
     }
     data.post.id = request.params.post_id;
     data.post.version = 2;
@@ -567,6 +586,9 @@ export function applyDefaultHandlers(pretender) {
     response(200, fixturesByUrl["/user_badges"])
   );
   pretender.delete("/user_badges/:badge_id", success);
+  pretender.put("/user_badges/:id/toggle_favorite", () =>
+    response(200, { user_badge: { is_favorite: true } })
+  );
 
   pretender.post("/posts", function (request) {
     const data = parsePostData(request.requestBody);
@@ -914,5 +936,174 @@ export function applyDefaultHandlers(pretender) {
     }
 
     return [404, { "Content-Type": "application/html" }, ""];
+  });
+
+  pretender.get("edit-directory-columns.json", () => {
+    return response(200, {
+      directory_columns: [
+        {
+          id: 1,
+          name: "likes_received",
+          type: "automatic",
+          enabled: true,
+          automatic_position: 1,
+          position: 1,
+          icon: "heart",
+          user_field: null,
+        },
+        {
+          id: 2,
+          name: "likes_given",
+          type: "automatic",
+          enabled: true,
+          automatic_position: 2,
+          position: 2,
+          icon: "heart",
+          user_field: null,
+        },
+        {
+          id: 3,
+          name: "topic_count",
+          type: "automatic",
+          enabled: true,
+          automatic_position: 3,
+          position: 3,
+          icon: null,
+          user_field: null,
+        },
+        {
+          id: 4,
+          name: "post_count",
+          type: "automatic",
+          enabled: true,
+          automatic_position: 4,
+          position: 4,
+          icon: null,
+          user_field: null,
+        },
+        {
+          id: 5,
+          name: "topics_entered",
+          type: "automatic",
+          enabled: true,
+          automatic_position: 5,
+          position: 5,
+          icon: null,
+          user_field: null,
+        },
+        {
+          id: 6,
+          name: "posts_read",
+          type: "automatic",
+          enabled: true,
+          automatic_position: 6,
+          position: 6,
+          icon: null,
+          user_field: null,
+        },
+        {
+          id: 7,
+          name: "days_visited",
+          type: "automatic",
+          enabled: true,
+          automatic_position: 7,
+          position: 7,
+          icon: null,
+          user_field: null,
+        },
+        {
+          id: 9,
+          name: null,
+          type: "user_field",
+          enabled: false,
+          automatic_position: null,
+          position: 8,
+          icon: null,
+          user_field: {
+            id: 3,
+            name: "Favorite Color",
+            description: "User's favorite color",
+            field_type: "text",
+            editable: false,
+            required: false,
+            show_on_profile: false,
+            show_on_user_card: true,
+            searchable: true,
+            position: 2,
+          },
+        },
+      ],
+    });
+  });
+
+  pretender.get("/directory-columns.json", () => {
+    return response(200, {
+      directory_columns: [
+        {
+          id: 1,
+          name: "likes_received",
+          type: "automatic",
+          position: 1,
+          icon: "heart",
+          user_field: null,
+        },
+        {
+          id: 2,
+          name: "likes_given",
+          type: "automatic",
+          position: 2,
+          icon: "heart",
+          user_field: null,
+        },
+        {
+          id: 3,
+          name: "topic_count",
+          type: "automatic",
+          position: 3,
+          icon: null,
+          user_field: null,
+        },
+        {
+          id: 4,
+          name: "post_count",
+          type: "automatic",
+          position: 4,
+          icon: null,
+          user_field: null,
+        },
+        {
+          id: 5,
+          name: "topics_entered",
+          type: "automatic",
+          position: 5,
+          icon: null,
+          user_field: null,
+        },
+        {
+          id: 6,
+          name: "posts_read",
+          type: "automatic",
+          position: 6,
+          icon: null,
+          user_field: null,
+        },
+        {
+          id: 7,
+          name: "days_visited",
+          type: "automatic",
+          position: 7,
+          icon: null,
+          user_field: null,
+        },
+        {
+          id: 9,
+          name: "Favorite Color",
+          type: "user_field",
+          position: 8,
+          icon: null,
+          user_field_id: 3,
+        },
+      ],
+    });
   });
 }

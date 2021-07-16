@@ -169,12 +169,22 @@ class TopicCreator
   end
 
   def setup_tags(topic)
-    return if @opts[:tags].blank?
+    if @opts[:tags].present?
+      valid_tags = DiscourseTagging.tag_topic_by_names(topic, @guardian, @opts[:tags])
+      unless valid_tags
+        topic.errors.add(:base, :unable_to_tag)
+        rollback_from_errors!(topic)
+      end
+    end
 
-    valid_tags = DiscourseTagging.tag_topic_by_names(topic, @guardian, @opts[:tags])
-    unless valid_tags
-      topic.errors.add(:base, :unable_to_tag)
-      rollback_from_errors!(topic)
+    watched_words = WordWatcher.words_for_action(:tag)
+    if watched_words.present?
+      word_watcher = WordWatcher.new("#{@opts[:title]} #{@opts[:raw]}")
+      word_watcher_tags = topic.tags.map(&:name)
+      watched_words.each do |word, tags|
+        word_watcher_tags += tags.split(",") if word_watcher.word_matches?(word)
+      end
+      DiscourseTagging.tag_topic_by_names(topic, Discourse.system_user.guardian, word_watcher_tags)
     end
   end
 

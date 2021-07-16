@@ -49,12 +49,17 @@
     }
   }
 
-  .field-error {
+  .field-error,
+  .field-warning {
     margin-top: 10px;
     margin-bottom: 10px;
-    background-color: var(--quaternary-low);
-    padding: 5px;
+    background-color: var(--danger-low-mid);
+    padding: 10px;
     white-space: pre-wrap;
+  }
+
+  .field-warning {
+    background-color: var(--highlight-low);
   }
 
   .admin-container {
@@ -591,7 +596,6 @@
   }
   label input {
     width: auto;
-    margin: 3px 0;
   }
 }
 .public-key {
@@ -599,7 +603,17 @@
   textarea {
     cursor: auto;
     min-height: 220px;
+    margin-bottom: 0;
   }
+  button {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+}
+
+.public-key-text-wrapper {
+  position: relative;
 }
 
 .public-key-note {

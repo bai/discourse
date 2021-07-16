@@ -91,6 +91,7 @@ class Category < ActiveRecord::Base
   after_commit :trigger_category_created_event, on: :create
   after_commit :trigger_category_updated_event, on: :update
   after_commit :trigger_category_destroyed_event, on: :destroy
+  after_commit :clear_site_cache
 
   after_save_commit :index_search
 
@@ -735,7 +736,9 @@ class Category < ActiveRecord::Base
   end
 
   def url
-    @@url_cache[self.id] ||= "#{Discourse.base_path}/c/#{slug_path.join('/')}/#{self.id}"
+    @@url_cache.defer_get_set(self.id) do
+      "#{Discourse.base_path}/c/#{slug_path.join('/')}/#{self.id}"
+    end
   end
 
   def url_with_id
@@ -785,7 +788,7 @@ class Category < ActiveRecord::Base
   end
 
   def update_reviewables
-    if SiteSetting.enable_category_group_moderation? && saved_change_to_reviewable_by_group_id?
+    if should_update_reviewables?
       Reviewable.where(category_id: id).update_all(reviewable_by_group_id: reviewable_by_group_id)
     end
   end
@@ -914,6 +917,10 @@ class Category < ActiveRecord::Base
 
   private
 
+  def should_update_reviewables?
+    SiteSetting.enable_category_group_moderation? && saved_change_to_reviewable_by_group_id?
+  end
+
   def check_permissions_compatibility(parent_permissions, child_permissions)
     parent_groups = parent_permissions.map(&:first)
 
@@ -950,6 +957,14 @@ class Category < ActiveRecord::Base
       SQL
 
     result.map { |row| [row.group_id, row.permission_type] }
+  end
+
+  def clear_site_cache
+    Site.clear_cache
+  end
+
+  def on_custom_fields_change
+    clear_site_cache
   end
 end
 
@@ -1011,7 +1026,7 @@ end
 #  min_tags_from_required_group              :integer          default(1), not null
 #  read_only_banner                          :string
 #  default_list_filter                       :string(20)       default("all")
-#  allow_unlimited_owner_edits_on_first_post :boolean          default(FALSE)
+#  allow_unlimited_owner_edits_on_first_post :boolean          default(FALSE), not null
 #
 # Indexes
 #

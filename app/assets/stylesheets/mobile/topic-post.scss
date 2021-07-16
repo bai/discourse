@@ -9,6 +9,12 @@
   }
 }
 
+.topic-post-visited {
+  + .topic-post article {
+    border-top: none;
+  }
+}
+
 .topic-post article {
   border-top: 1px solid var(--primary-low);
   padding: 15px 0 8px 0;
@@ -295,8 +301,8 @@ span.post-count {
 
 #topic-title {
   z-index: z("base") + 1;
-  margin: 0 0 0 0 !important;
-  padding: 15px 0;
+  margin: 0;
+  padding: 0 0 1em;
 }
 
 .quote-button.visible {
